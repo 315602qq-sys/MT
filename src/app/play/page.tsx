@@ -1129,6 +1129,7 @@ function PlayPageClient() {
   const lastRefreshTimeRef = useRef(0); // 上次刷新时间
   const refreshTimerRef = useRef<NodeJS.Timeout | null>(null); // 14分钟定时器
   const currentXiaoyaUrlRef = useRef<string>(''); // 当前xiaoya原始URL（用于刷新）
+  const isInitialLoadRef = useRef(true); // 标记是否为首次加载
 
   // 视频源代理模式状态
   const [sourceProxyMode, setSourceProxyMode] = useState(false);
@@ -1573,6 +1574,9 @@ function PlayPageClient() {
                 video.play().catch(err => {
                   console.warn('[链接刷新] 自动播放失败:', err);
                 });
+              } else {
+                // 确保暂停状态
+                video.pause();
               }
 
               setIsRefreshingUrl(false);
@@ -1593,11 +1597,14 @@ function PlayPageClient() {
 
             video.addEventListener('seeked', onSeeked, { once: true });
           } else {
-            // 如果是从头开始，直接播放
+            // 如果是从头开始
             if (!isPaused) {
               video.play().catch(err => {
                 console.warn('[链接刷新] 自动播放失败:', err);
               });
+            } else {
+              // 确保暂停状态
+              video.pause();
             }
 
             setIsRefreshingUrl(false);
@@ -1711,6 +1718,7 @@ function PlayPageClient() {
     lastRefreshTimeRef.current = 0;
     currentXiaoyaUrlRef.current = ''; // 清空旧的原始URL
     clearRefreshTimer(); // 清除旧的定时器
+    isInitialLoadRef.current = true; // 重置为首次加载
 
     // 动态设置 referrer policy：只在小雅源时不发送 Referer
     const existingMeta = document.querySelector('meta[name="referrer"]');
@@ -4694,8 +4702,9 @@ function PlayPageClient() {
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
               console.log('[HLS] Manifest解析完成');
 
-              // 如果是xiaoya源的m3u8，启动14分钟定时刷新
-              if (currentXiaoyaUrlRef.current && url.includes('.m3u8')) {
+              // 只在首次加载时启动定时器（后续刷新会在refreshXiaoyaUrl中启动）
+              if (isInitialLoadRef.current && currentXiaoyaUrlRef.current && url.includes('.m3u8')) {
+                isInitialLoadRef.current = false; // 标记已完成首次加载
                 startRefreshTimer(hls, video);
               }
             });
